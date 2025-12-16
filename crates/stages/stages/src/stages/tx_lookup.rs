@@ -1,19 +1,18 @@
 use alloy_eips::eip2718::Encodable2718;
 use alloy_primitives::{TxHash, TxNumber};
-use num_traits::Zero;
 use reth_config::config::{EtlConfig, TransactionLookupConfig};
 use reth_db_api::{
     cursor::{DbCursorRO, DbCursorRW},
     table::Value,
     tables,
     transaction::DbTxMut,
-    RawKey, RawValue,
 };
 use reth_etl::Collector;
 use reth_primitives_traits::{NodePrimitives, SignedTransaction};
 use reth_provider::{
     BlockReader, DBProvider, PruneCheckpointReader, PruneCheckpointWriter,
-    StaticFileProviderFactory, StatsReader, TransactionsProvider, TransactionsProviderExt,
+    StaticFileProviderFactory, StatsReader, TransactionHashNumbersWriter, TransactionsProvider,
+    TransactionsProviderExt,
 };
 use reth_prune_types::{PruneCheckpoint, PruneMode, PrunePurpose, PruneSegment};
 use reth_stages_api::{
@@ -65,7 +64,8 @@ where
         + PruneCheckpointReader
         + StatsReader
         + StaticFileProviderFactory<Primitives: NodePrimitives<SignedTx: Value + SignedTransaction>>
-        + TransactionsProviderExt,
+        + TransactionsProviderExt
+        + TransactionHashNumbersWriter,
 {
     /// Return the id of the stage
     fn id(&self) -> StageId {
@@ -150,35 +150,27 @@ where
             );
 
             if range_output.is_final_range {
-                let append_only =
-                    provider.count_entries::<tables::TransactionHashNumbers>()?.is_zero();
-                let mut txhash_cursor = provider
-                    .tx_ref()
-                    .cursor_write::<tables::RawTable<tables::TransactionHashNumbers>>()?;
-
                 let total_hashes = hash_collector.len();
                 let interval = (total_hashes / 10).max(1);
-                for (index, hash_to_number) in hash_collector.iter()?.enumerate() {
-                    let (hash, number) = hash_to_number?;
-                    if index > 0 && index.is_multiple_of(interval) {
-                        info!(
-                            target: "sync::stages::transaction_lookup",
-                            ?append_only,
-                            progress = %format!("{:.2}%", (index as f64 / total_hashes as f64) * 100.0),
-                            "Inserting hashes"
-                        );
-                    }
+                let mut index = 0usize;
 
-                    let key = RawKey::<TxHash>::from_vec(hash);
-                    if append_only {
-                        txhash_cursor.append(key, &RawValue::<TxNumber>::from_vec(number))?
-                    } else {
-                        txhash_cursor.insert(key, &RawValue::<TxNumber>::from_vec(number))?
-                    }
-                }
+                let append_only =
+                    provider.insert_transaction_hash_numbers_raw(hash_collector.iter()?.inspect(
+                        |_| {
+                            if index > 0 && index.is_multiple_of(interval) {
+                                info!(
+                                    target: "sync::stages::transaction_lookup",
+                                    progress = %format!("{:.2}%", (index as f64 / total_hashes as f64) * 100.0),
+                                    "Inserting hashes"
+                                );
+                            }
+                            index += 1;
+                        },
+                    ))?;
 
                 trace!(target: "sync::stages::transaction_lookup",
                     total_hashes,
+                    ?append_only,
                     "Transaction hashes inserted"
                 );
 

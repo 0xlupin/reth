@@ -6,7 +6,8 @@ use crate::{
     HashedPostStateProvider, HeaderProvider, NodePrimitivesProvider, PruneCheckpointReader,
     ReceiptProvider, ReceiptProviderIdExt, StageCheckpointReader, StateProofProvider,
     StateProvider, StateProviderBox, StateProviderFactory, StateReader, StateRootProvider,
-    StorageRootProvider, TransactionVariant, TransactionsProvider, TrieReader,
+    StorageRootProvider, TransactionHashNumbersWriter, TransactionVariant, TransactionsProvider,
+    TrieReader,
 };
 
 #[cfg(feature = "db-api")]
@@ -303,6 +304,20 @@ impl<C: Send + Sync, N: NodePrimitives> TransactionsProvider for NoopProvider<C,
 
     fn transaction_sender(&self, _id: TxNumber) -> ProviderResult<Option<Address>> {
         Ok(None)
+    }
+}
+
+impl<C: Send + Sync, N: NodePrimitives> TransactionHashNumbersWriter for NoopProvider<C, N> {
+    fn insert_transaction_hash_numbers_raw<I>(
+        &self,
+        _hash_to_number_iter: I,
+    ) -> ProviderResult<bool>
+    where
+        I: Iterator<Item = std::io::Result<(Vec<u8>, Vec<u8>)>>,
+    {
+        // Returns true (append-only mode) as a reasonable default for this no-op implementation.
+        // The return value is only used for logging purposes.
+        Ok(true)
     }
 }
 

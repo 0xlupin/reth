@@ -47,7 +47,7 @@ use reth_db_api::{
     table::Table,
     tables,
     transaction::{DbTx, DbTxMut},
-    BlockNumberList, PlainAccountState, PlainStorageState,
+    BlockNumberList, PlainAccountState, PlainStorageState, RawKey, RawValue,
 };
 use reth_execution_types::{Chain, ExecutionOutcome};
 use reth_node_types::{BlockTy, BodyTy, HeaderTy, NodeTypes, ReceiptTy, TxTy};
@@ -62,7 +62,7 @@ use reth_static_file_types::StaticFileSegment;
 use reth_storage_api::{
     BlockBodyIndicesProvider, BlockBodyReader, MetadataProvider, MetadataWriter,
     NodePrimitivesProvider, StateProvider, StorageChangeSetReader, StorageSettingsCache,
-    TryIntoHistoricalStateProvider,
+    TransactionHashNumbersWriter, TryIntoHistoricalStateProvider,
 };
 use reth_storage_errors::provider::ProviderResult;
 use reth_trie::{
@@ -3118,6 +3118,56 @@ impl<TX: DbTx + 'static, N: NodeTypesForProvider> StatsReader for DatabaseProvid
         };
 
         Ok(db_entries + static_file_entries)
+    }
+}
+
+impl<TX: DbTxMut + DbTx + 'static, N: NodeTypesForProvider> TransactionHashNumbersWriter
+    for DatabaseProvider<TX, N>
+{
+    fn insert_transaction_hash_numbers_raw<I>(&self, hash_to_number_iter: I) -> ProviderResult<bool>
+    where
+        I: Iterator<Item = std::io::Result<(Vec<u8>, Vec<u8>)>>,
+    {
+        // Check if RocksDB is configured for this table
+        #[cfg(all(unix, feature = "rocksdb"))]
+        if self.cached_storage_settings().transaction_hash_numbers_in_rocksdb {
+            use reth_db_api::table::Decompress;
+
+            // RocksDB path: use batch writes
+            // Note: RocksDB doesn't have an append-only optimization like MDBX,
+            // so we always return false for append_only mode
+            self.rocksdb_provider().write_batch(|batch| {
+                for entry in hash_to_number_iter {
+                    let (hash_bytes, number_bytes) = entry.map_err(ProviderError::other)?;
+
+                    // Convert raw bytes to typed values
+                    let hash = TxHash::try_from(hash_bytes.as_slice())
+                        .map_err(|_| ProviderError::InvalidStorageOutput)?;
+                    let number: TxNumber = Decompress::decompress(&number_bytes)?;
+
+                    batch.put::<tables::TransactionHashNumbers>(hash, &number)?;
+                }
+                Ok(())
+            })?;
+
+            return Ok(false); // RocksDB doesn't use append-only optimization
+        }
+
+        // MDBX path: use raw cursor for performance
+        let append_only = self.count_entries::<tables::TransactionHashNumbers>()? == 0;
+        let mut cursor =
+            self.tx.cursor_write::<tables::RawTable<tables::TransactionHashNumbers>>()?;
+
+        for entry in hash_to_number_iter {
+            let (hash, number) = entry.map_err(ProviderError::other)?;
+            let key = RawKey::<TxHash>::from_vec(hash);
+            if append_only {
+                cursor.append(key, &RawValue::<TxNumber>::from_vec(number))?;
+            } else {
+                cursor.insert(key, &RawValue::<TxNumber>::from_vec(number))?;
+            }
+        }
+        Ok(append_only)
     }
 }
 
