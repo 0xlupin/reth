@@ -1167,9 +1167,21 @@ impl MultiProofTask {
                                 let value = occupied.get_mut();
 
                                 if value.is_selfdestructed() {
+                                    // If account was selfdestructed before, we can just replace its storage
                                     value.storage = acc.storage;
                                 } else {
-                                    value.storage.extend(acc.storage);
+                                    // Otherwise, we need to update the existing storage
+                                    for (slot, new_value) in acc.storage {
+                                        match value.storage.entry(slot) {
+                                            Entry::Vacant(vacant) => {
+                                                vacant.insert(new_value);
+                                            }
+                                            Entry::Occupied(mut occupied) => {
+                                                occupied.get_mut().present_value =
+                                                    new_value.present_value;
+                                            }
+                                        }
+                                    }
                                 }
 
                                 value.info = acc.info;
