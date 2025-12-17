@@ -1166,9 +1166,14 @@ impl MultiProofTask {
                             Entry::Occupied(mut occupied) => {
                                 let value = occupied.get_mut();
 
-                                value.storage.extend(acc.storage);
+                                if value.is_selfdestructed() {
+                                    value.storage = acc.storage;
+                                } else {
+                                    value.storage.extend(acc.storage);
+                                }
+
                                 value.info = acc.info;
-                                value.status = acc.status;
+                                value.status |= acc.status;
                                 value.transaction_id = acc.transaction_id;
                             }
                         }
