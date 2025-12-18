@@ -1079,14 +1079,8 @@ where
     fn spawn_deferred_trie_task(
         &self,
         block: RecoveredBlock<N::Block>,
-<<<<<<< HEAD
         execution_outcome: Arc<ExecutionOutcome<N::Receipt>>,
-        ctx: &TreeCtx<'_, N>,
-=======
-        output: BlockExecutionOutput<N::Receipt>,
-        block_number: u64,
         ctx: &TreeCtx<'_, N, P>,
->>>>>>> c138a3e4ff (perf(engine): deduplicate state_provider_builder calls with type-safe TreeCtx)
         hashed_state: HashedPostState,
         trie_output: TrieUpdates,
     ) -> ExecutedBlock<N> {
