@@ -1,13 +1,14 @@
 //! Various noop implementations for traits.
 
+#[cfg(feature = "std")]
+use crate::TransactionHashNumbersWriter;
 use crate::{
     AccountReader, BlockBodyIndicesProvider, BlockHashReader, BlockIdReader, BlockNumReader,
     BlockReader, BlockReaderIdExt, BlockSource, BytecodeReader, ChangeSetReader,
     HashedPostStateProvider, HeaderProvider, NodePrimitivesProvider, PruneCheckpointReader,
     ReceiptProvider, ReceiptProviderIdExt, StageCheckpointReader, StateProofProvider,
     StateProvider, StateProviderBox, StateProviderFactory, StateReader, StateRootProvider,
-    StorageRootProvider, TransactionHashNumbersWriter, TransactionVariant, TransactionsProvider,
-    TrieReader,
+    StorageRootProvider, TransactionVariant, TransactionsProvider, TrieReader,
 };
 
 #[cfg(feature = "db-api")]
@@ -307,6 +308,7 @@ impl<C: Send + Sync, N: NodePrimitives> TransactionsProvider for NoopProvider<C,
     }
 }
 
+#[cfg(feature = "std")]
 impl<C: Send + Sync, N: NodePrimitives> TransactionHashNumbersWriter for NoopProvider<C, N> {
     fn insert_transaction_hash_numbers_raw<I>(
         &self,

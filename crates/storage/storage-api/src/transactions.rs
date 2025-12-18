@@ -115,6 +115,7 @@ pub trait TransactionsProviderExt: BlockReader {
 /// This trait abstracts the bulk write operation for the `TransactionHashNumbers` table.
 /// Implementations may choose an optimal insert strategy depending on the underlying
 /// database and table state.
+#[cfg(feature = "std")]
 #[auto_impl::auto_impl(&, Arc, Box)]
 pub trait TransactionHashNumbersWriter: Send + Sync {
     /// Insert transaction hash to number mappings into the database.
