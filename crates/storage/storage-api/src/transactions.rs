@@ -112,15 +112,12 @@ pub trait TransactionsProviderExt: BlockReader {
 
 /// Writer trait for transaction hash to number mappings.
 ///
-/// This trait abstracts the bulk write operation for the `TransactionHashNumbers` table,
-/// handling the append-only optimization internally.
+/// This trait abstracts the bulk write operation for the `TransactionHashNumbers` table.
+/// Implementations may choose an optimal insert strategy depending on the underlying
+/// database and table state.
 #[auto_impl::auto_impl(&, Arc, Box)]
 pub trait TransactionHashNumbersWriter: Send + Sync {
     /// Insert transaction hash to number mappings into the database.
-    ///
-    /// This method handles the append-only optimization internally:
-    /// - If the `TransactionHashNumbers` table is empty, uses `append` (O(1))
-    /// - Otherwise, uses `insert` (O(log n))
     ///
     /// # Arguments
     ///
@@ -131,13 +128,11 @@ pub trait TransactionHashNumbersWriter: Send + Sync {
     ///
     /// # Returns
     ///
-    /// Returns `Ok(true)` if append-only mode was used (table was empty),
-    /// `Ok(false)` if insert mode was used (table had existing entries).
+    /// Returns `Ok(true)` if the table was empty before insertion, `Ok(false)` otherwise.
     ///
     /// # Errors
     ///
-    /// Returns `ProviderError::Other` if the iterator yields an I/O error,
-    /// or a database error if insertion fails.
+    /// Returns an error if the iterator yields an I/O error, or if insertion fails.
     fn insert_transaction_hash_numbers_raw<I>(
         &self,
         hash_to_number_iter: I,

@@ -44,7 +44,7 @@ use reth_db_api::{
         sharded_key, storage_sharded_key::StorageShardedKey, AccountBeforeTx, BlockNumberAddress,
         BlockNumberHashedAddress, ShardedKey, StorageSettings, StoredBlockBodyIndices,
     },
-    table::Table,
+    table::{Decompress, Table},
     tables,
     transaction::{DbTx, DbTxMut},
     BlockNumberList, PlainAccountState, PlainStorageState, RawKey, RawValue,
@@ -3128,21 +3128,14 @@ impl<TX: DbTxMut + DbTx + 'static, N: NodeTypesForProvider> TransactionHashNumbe
     where
         I: Iterator<Item = std::io::Result<(Vec<u8>, Vec<u8>)>>,
     {
-        // Check if RocksDB is configured for this table
         #[cfg(all(unix, feature = "rocksdb"))]
         if self.cached_storage_settings().transaction_hash_numbers_in_rocksdb {
-            use reth_db_api::table::Decompress;
-
-            // RocksDB path: use batch writes
-            // Note: RocksDB doesn't have an append-only optimization like MDBX,
-            // so we always return false for append_only mode
             self.rocksdb_provider().write_batch(|batch| {
                 for entry in hash_to_number_iter {
                     let (hash_bytes, number_bytes) = entry.map_err(ProviderError::other)?;
 
-                    // Convert raw bytes to typed values
-                    let hash = TxHash::try_from(hash_bytes.as_slice())
-                        .map_err(|_| ProviderError::InvalidStorageOutput)?;
+                    let hash =
+                        TxHash::try_from(hash_bytes.as_slice()).map_err(ProviderError::other)?;
                     let number: TxNumber = Decompress::decompress(&number_bytes)?;
 
                     batch.put::<tables::TransactionHashNumbers>(hash, &number)?;
@@ -3150,7 +3143,7 @@ impl<TX: DbTxMut + DbTx + 'static, N: NodeTypesForProvider> TransactionHashNumbe
                 Ok(())
             })?;
 
-            return Ok(false); // RocksDB doesn't use append-only optimization
+            return Ok(false);
         }
 
         // MDBX path: use raw cursor for performance
