@@ -122,7 +122,7 @@ pub trait TransactionHashNumbersWriter: Send + Sync {
     /// # Arguments
     ///
     /// * `hash_to_number_iter` - Iterator yielding pre-encoded `(TxHash, TxNumber)` pairs as raw
-    ///   bytes. This is typically obtained from an ETL collector via [`reth_etl::Collector::iter`].
+    ///   bytes. This is typically obtained from an ETL collector via `reth_etl::Collector::iter`.
     ///   The hash bytes must be the encoded `TxHash` (32 bytes), and number bytes must be the
     ///   compressed `TxNumber`.
     ///

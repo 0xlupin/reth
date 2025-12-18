@@ -44,7 +44,7 @@ use reth_db_api::{
         sharded_key, storage_sharded_key::StorageShardedKey, AccountBeforeTx, BlockNumberAddress,
         BlockNumberHashedAddress, ShardedKey, StorageSettings, StoredBlockBodyIndices,
     },
-    table::{Decompress, Table},
+    table::Table,
     tables,
     transaction::{DbTx, DbTxMut},
     BlockNumberList, PlainAccountState, PlainStorageState, RawKey, RawValue,
@@ -3130,6 +3130,8 @@ impl<TX: DbTxMut + DbTx + 'static, N: NodeTypesForProvider> TransactionHashNumbe
     {
         #[cfg(all(unix, feature = "rocksdb"))]
         if self.cached_storage_settings().transaction_hash_numbers_in_rocksdb {
+            use reth_db_api::table::Decompress;
+
             self.rocksdb_provider().write_batch(|batch| {
                 for entry in hash_to_number_iter {
                     let (hash_bytes, number_bytes) = entry.map_err(ProviderError::other)?;
