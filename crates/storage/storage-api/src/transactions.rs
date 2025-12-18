@@ -129,7 +129,7 @@ pub trait TransactionHashNumbersWriter: Send + Sync {
     ///
     /// # Returns
     ///
-    /// Returns `Ok(true)` if the table was empty before insertion, `Ok(false)` otherwise.
+    /// Returns whether append-only mode was used (for logging only). Not all backends support this.
     ///
     /// # Errors
     ///
